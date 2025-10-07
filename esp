@@ -1,0 +1,394 @@
+-- Roblox ESP 库
+local ESPLibrary = {}
+
+-- 颜色配置
+ESPLibrary.Colors = {
+    Red = Color3.fromRGB(255, 0, 0),
+    Green = Color3.fromRGB(0, 255, 0),
+    Blue = Color3.fromRGB(0, 0, 255),
+    Yellow = Color3.fromRGB(255, 255, 0),
+    Purple = Color3.fromRGB(255, 0, 255),
+    White = Color3.fromRGB(255, 255, 255),
+    Cyan = Color3.fromRGB(0, 255, 255)
+}
+
+-- 基础设置
+ESPLibrary.Settings = {
+    Enabled = false,
+    TeamCheck = false,
+    UseTeamColor = true,
+    MaxDistance = 1000,
+    TextSize = 14,
+    TextColor = Color3.fromRGB(255, 255, 255),
+    BoxColor = Color3.fromRGB(255, 0, 0),
+    TracerColor = Color3.fromRGB(255, 255, 255),
+    ShowDistance = true,
+    ShowName = true,
+    ShowHealth = true
+}
+
+-- 存储ESP对象
+ESPLibrary.Objects = {}
+
+-- 工具函数
+function ESPLibrary:IsTeamMate(player)
+    if not ESPLibrary.Settings.TeamCheck then return false end
+    return player.Team == game.Players.LocalPlayer.Team
+end
+
+function ESPLibrary:GetColor(player)
+    if ESPLibrary.Settings.UseTeamColor and player.Team then
+        return player.TeamColor.Color
+    end
+    return ESPLibrary.Settings.BoxColor
+end
+
+function ESPLibrary:CalculateBox(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return nil end
+    
+    local head = character:FindFirstChild("Head")
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not head or not humanoidRootPart then return nil end
+    
+    local distance = (game.Workspace.CurrentCamera.CFrame.Position - humanoidRootPart.Position).Magnitude
+    local scaleFactor = math.clamp(1000 / distance, 0.5, 2)
+    
+    local size
+    if humanoid.RigType == Enum.HumanoidRigType.R15 then
+        size = Vector2.new(3 * scaleFactor, 5 * scaleFactor)
+    else
+        size = Vector2.new(3 * scaleFactor, 4.5 * scaleFactor)
+    end
+    
+    return size
+end
+
+-- 2D方框ESP
+function ESPLibrary:CreateBoxESP(player)
+    local box = {
+        Player = player,
+        Components = {}
+    }
+    
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ESPBox_" .. player.Name
+    screenGui.Parent = game.CoreGui
+    screenGui.ResetOnSpawn = false
+    
+    local boxFrame = Instance.new("Frame")
+    boxFrame.Name = "Box"
+    boxFrame.BackgroundTransparency = 1
+    boxFrame.BorderSizePixel = 2
+    boxFrame.BorderColor3 = self:GetColor(player)
+    boxFrame.Size = UDim2.new(0, 100, 0, 150)
+    boxFrame.Parent = screenGui
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = ESPLibrary.Settings.TextColor
+    nameLabel.TextSize = ESPLibrary.Settings.TextSize
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = player.Name
+    nameLabel.Size = UDim2.new(1, 0, 0, 15)
+    nameLabel.Position = UDim2.new(0, 0, -0.1, 0)
+    nameLabel.Parent = boxFrame
+    
+    local healthLabel = Instance.new("TextLabel")
+    healthLabel.Name = "Health"
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    healthLabel.TextSize = ESPLibrary.Settings.TextSize - 2
+    healthLabel.Font = Enum.Font.Gotham
+    healthLabel.Size = UDim2.new(1, 0, 0, 15)
+    healthLabel.Position = UDim2.new(0, 0, 1, 0)
+    healthLabel.Parent = boxFrame
+    
+    box.Components = {
+        ScreenGui = screenGui,
+        BoxFrame = boxFrame,
+        NameLabel = nameLabel,
+        HealthLabel = healthLabel
+    }
+    
+    self.Objects[player] = box
+    return box
+end
+
+-- 3D方框ESP
+function ESPLibrary:Create3DBoxESP(player)
+    local box3d = {
+        Player = player,
+        Components = {}
+    }
+    
+    local character = player.Character
+    if not character then return nil end
+    
+    local folder = Instance.new("Folder")
+    folder.Name = "ESP3DBox_" .. player.Name
+    folder.Parent = character
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local width, height, depth
+    
+    if humanoid and humanoid.RigType == Enum.HumanoidRigType.R15 then
+        width, height, depth = 2.5, 5, 1
+    else
+        width, height, depth = 2, 4.5, 1
+    end
+    
+    local corners = {
+        Vector3.new(-width/2, -height/2, -depth/2),
+        Vector3.new(width/2, -height/2, -depth/2),
+        Vector3.new(width/2, height/2, -depth/2),
+        Vector3.new(-width/2, height/2, -depth/2),
+        Vector3.new(-width/2, -height/2, depth/2),
+        Vector3.new(width/2, -height/2, depth/2),
+        Vector3.new(width/2, height/2, depth/2),
+        Vector3.new(-width/2, height/2, depth/2)
+    }
+    
+    local lines = {
+        {1,2}, {2,3}, {3,4}, {4,1},
+        {5,6}, {6,7}, {7,8}, {8,5},
+        {1,5}, {2,6}, {3,7}, {4,8}
+    }
+    
+    for i, line in pairs(lines) do
+        local startCorner = corners[line[1]]
+        local endCorner = corners[line[2]]
+        
+        local linePart = Instance.new("Part")
+        linePart.Name = "Line_" .. i
+        linePart.Anchored = true
+        linePart.CanCollide = false
+        linePart.Material = Enum.Material.Neon
+        linePart.Color = self:GetColor(player)
+        linePart.Size = Vector3.new(0.1, 0.1, (startCorner - endCorner).Magnitude)
+        linePart.CFrame = CFrame.new((startCorner + endCorner) / 2, endCorner)
+        linePart.Parent = folder
+    end
+    
+    box3d.Components.Folder = folder
+    self.Objects[player] = box3d
+    return box3d
+end
+
+-- 追踪线ESP
+function ESPLibrary:CreateTracerESP(player)
+    local tracer = {
+        Player = player,
+        Components = {}
+    }
+    
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ESPTracer_" .. player.Name
+    screenGui.Parent = game.CoreGui
+    
+    local line = Instance.new("Frame")
+    line.Name = "Tracer"
+    line.BackgroundColor3 = ESPLibrary.Settings.TracerColor
+    line.BorderSizePixel = 0
+    line.Size = UDim2.new(0, 2, 0, 0)
+    line.AnchorPoint = Vector2.new(0.5, 0)
+    line.Position = UDim2.new(0.5, 0, 0, 0)
+    line.Parent = screenGui
+    
+    tracer.Components = {
+        ScreenGui = screenGui,
+        Line = line
+    }
+    
+    self.Objects[player] = tracer
+    return tracer
+end
+
+-- 头部圆点ESP
+function ESPLibrary:CreateHeadDotESP(player)
+    local headDot = {
+        Player = player,
+        Components = {}
+    }
+    
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ESPHeadDot_" .. player.Name
+    screenGui.Parent = game.CoreGui
+    
+    local dot = Instance.new("Frame")
+    dot.Name = "HeadDot"
+    dot.BackgroundColor3 = self:GetColor(player)
+    dot.Size = UDim2.new(0, 4, 0, 4)
+    dot.AnchorPoint = Vector2.new(0.5, 0.5)
+    dot.Position = UDim2.new(0.5, 0, 0.5, 0)
+    dot.Parent = screenGui
+    
+    headDot.Components = {
+        ScreenGui = screenGui,
+        Dot = dot
+    }
+    
+    self.Objects[player] = headDot
+    return headDot
+end
+
+-- 更新ESP
+function ESPLibrary:UpdateESP()
+    for player, espObject in pairs(self.Objects) do
+        if not player or not player.Parent or not player.Character then
+            self:RemoveESP(player)
+            continue
+        end
+        
+        local character = player.Character
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        local head = character:FindFirstChild("Head")
+        
+        if not humanoidRootPart or not head then
+            if espObject.Components.ScreenGui then
+                espObject.Components.ScreenGui.Enabled = false
+            end
+            continue
+        end
+        
+        local distance = (game.Workspace.CurrentCamera.CFrame.Position - humanoidRootPart.Position).Magnitude
+        if distance > ESPLibrary.Settings.MaxDistance then
+            if espObject.Components.ScreenGui then
+                espObject.Components.ScreenGui.Enabled = false
+            end
+            continue
+        end
+        
+        -- 更新2D方框
+        if espObject.Components.BoxFrame then
+            local headPos, headOnScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+            local rootPos, rootOnScreen = workspace.CurrentCamera:WorldToViewportPoint(humanoidRootPart.Position)
+            
+            if headOnScreen and rootOnScreen then
+                local width = math.abs(headPos.X - rootPos.X) + 20
+                local height = math.abs(headPos.Y - rootPos.Y) + 30
+                
+                espObject.Components.BoxFrame.Size = UDim2.new(0, width, 0, height)
+                espObject.Components.BoxFrame.Position = UDim2.new(0, math.min(headPos.X, rootPos.X) - 10, 0, math.min(headPos.Y, rootPos.Y) - 15)
+                espObject.Components.BoxFrame.Visible = true
+                espObject.Components.BoxFrame.BorderColor3 = self:GetColor(player)
+                
+                -- 更新文字
+                if ESPLibrary.Settings.ShowName then
+                    espObject.Components.NameLabel.Visible = true
+                    espObject.Components.NameLabel.Text = player.Name
+                else
+                    espObject.Components.NameLabel.Visible = false
+                end
+                
+                if ESPLibrary.Settings.ShowHealth then
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        espObject.Components.HealthLabel.Visible = true
+                        espObject.Components.HealthLabel.Text = "HP: " .. math.floor(humanoid.Health)
+                    end
+                else
+                    espObject.Components.HealthLabel.Visible = false
+                end
+                
+                if ESPLibrary.Settings.ShowDistance then
+                    espObject.Components.HealthLabel.Text = espObject.Components.HealthLabel.Text .. " | " .. math.floor(distance) .. "m"
+                end
+            else
+                espObject.Components.BoxFrame.Visible = false
+            end
+        end
+        
+        -- 更新追踪线
+        if espObject.Components.Line then
+            local rootPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(humanoidRootPart.Position)
+            if onScreen then
+                local centerX = workspace.CurrentCamera.ViewportSize.X / 2
+                local centerY = workspace.CurrentCamera.ViewportSize.Y
+                
+                local angle = math.atan2(rootPos.Y - centerY, rootPos.X - centerX)
+                local lineLength = math.sqrt((rootPos.X - centerX)^2 + (rootPos.Y - centerY)^2)
+                
+                espObject.Components.Line.Size = UDim2.new(0, 2, 0, lineLength)
+                espObject.Components.Line.Rotation = math.deg(angle)
+                espObject.Components.Line.Visible = true
+                espObject.Components.Line.BackgroundColor3 = ESPLibrary.Settings.TracerColor
+            else
+                espObject.Components.Line.Visible = false
+            end
+        end
+        
+        -- 更新头部圆点
+        if espObject.Components.Dot then
+            local headPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                espObject.Components.Dot.Position = UDim2.new(0, headPos.X, 0, headPos.Y)
+                espObject.Components.Dot.Visible = true
+                espObject.Components.Dot.BackgroundColor3 = self:GetColor(player)
+            else
+                espObject.Components.Dot.Visible = false
+            end
+        end
+    end
+end
+
+-- 移除ESP
+function ESPLibrary:RemoveESP(player)
+    if self.Objects[player] then
+        local espObject = self.Objects[player]
+        for _, component in pairs(espObject.Components) do
+            if component and component.Parent then
+                component:Destroy()
+            end
+        end
+        self.Objects[player] = nil
+    end
+end
+
+-- 初始化ESP
+function ESPLibrary:Initialize()
+    -- 为现有玩家创建ESP
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and not self:IsTeamMate(player) then
+            self:CreateBoxESP(player)
+            self:CreateTracerESP(player)
+            self:CreateHeadDotESP(player)
+        end
+    end
+    
+    -- 监听新玩家
+    game.Players.PlayerAdded:Connect(function(player)
+        player.CharacterAdded:Connect(function()
+            if not self:IsTeamMate(player) then
+                wait(1) -- 等待角色加载
+                self:CreateBoxESP(player)
+                self:CreateTracerESP(player)
+                self:CreateHeadDotESP(player)
+            end
+        end)
+    end)
+    
+    -- 监听玩家离开
+    game.Players.PlayerRemoving:Connect(function(player)
+        self:RemoveESP(player)
+    end)
+    
+    -- 更新循环
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if ESPLibrary.Settings.Enabled then
+            self:UpdateESP()
+        else
+            -- 禁用所有ESP
+            for _, espObject in pairs(self.Objects) do
+                if espObject.Components.ScreenGui then
+                    espObject.Components.ScreenGui.Enabled = false
+                end
+            end
+        end
+    end)
+end
+
+-- 导出库
+return ESPLibrary
