@@ -439,7 +439,7 @@ Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 Frame.BorderSizePixel = 0
 Frame.Position = UDim2.new(0.00829315186, 0, 0.31107837, 0)
-Frame.Size = UDim2.new(0, 5, 0, 5)
+Frame.Size = UDim2.new(0, 25, 0, 25)
 Frame.BackgroundTransparency = 1.000
 
 UICorner.CornerRadius = UDim.new(0, 90)
@@ -449,7 +449,7 @@ Open.Parent = Frame
 Open.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 Open.BorderColor3 = Color3.fromRGB(0, 0, 0)
 Open.BorderSizePixel = 0
-Open.Size = UDim2.new(2, 5, 2, 5)
+Open.Size = UDim2.new(2, 25, 2, 25)
 Open.Active = true
 Open.Draggable = true
 Open.Image = "rbxassetid://4ea90238c303ea1ed39f5fcb97c3f849436998931_raw"
@@ -583,7 +583,7 @@ UIG.Parent = Open
           SectionOpened.BackgroundTransparency = 1.000
           SectionOpened.BorderSizePixel = 0
           SectionOpened.Size = UDim2.new(0, 26, 0, 26)
-          SectionOpened.Image = "rbxassetid://18942673533"
+          SectionOpened.Image = "rbxassetid://4ea90238c303ea1ed39f5fcb97c3f849436998931_raw"
           SectionOpened.ImageTransparency = 1.000
     
           SectionToggle.Name = "SectionToggle"
